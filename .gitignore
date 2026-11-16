@@ -1,0 +1,18 @@
+# Frontend / Node
+node_modules/
+dist/
+
+# Rust / Tauri
+src-tauri/target/
+src-tauri/gen/schemas/
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# Editors & OS
+.vscode/
+.idea/
+.DS_Store
+*.log

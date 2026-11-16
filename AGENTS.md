@@ -1,0 +1,33 @@
+# Clippie
+
+Cross-platform (Windows + Linux) clipboard manager: floating bar docked to a screen edge, global hotkeys, animated paste, Wi-Fi sync planned. Runs as an always-on background daemon — efficiency is a hard requirement: event-driven everywhere, no polling, single instance, minimal RAM/CPU when idle.
+
+## Status
+
+- Repo not yet scaffolded (Phase 0 spike pending). Do not invent build/test commands; after scaffolding, add the real verified commands here.
+- The decisions below were agreed with the user and are binding — don't re-litigate the stack or product rules.
+
+## Locked stack
+
+- Tauri 2: Rust core in `src-tauri/` (daemon: clipboard watcher, hotkey engine, paste engine, SQLite store; sync module later), Svelte 5 + TypeScript + Tailwind in `src/` (overlay bar + settings window).
+- SQLite for history/settings; schema must stay sync-ready from day one: UUIDs, `device_id`, timestamps, soft-delete tombstones. Retrofitting this is expensive.
+- Image blobs live on disk, content-addressed; SQLite holds metadata only.
+
+## Platform constraints (reread before touching platform code)
+
+- Primary Linux target is Wayland/Hyprland (user runs Omarchy). Global hotkeys, drag-copy (hold chord + select + release = copy), and animated paste (synthetic keystrokes) are impossible app-side on Wayland: they require Hyprland cooperation — generated config binds / the global-shortcuts protocol — and typing via `wtype`. X11 uses xdotool; Windows uses native hooks + SendInput. Clippie should auto-detect Hyprland and offer to install its config snippet.
+- Windows: Ctrl+Alt is delivered as AltGr on international layouts. Every hotkey MUST be remappable in settings; Ctrl+Alt stays the default chord.
+- Release scope: full support on Windows + Hyprland + X11. Other Wayland desktops get reduced functionality by design — don't add workarounds for them.
+- The bar is a layer-shell surface on Wayland (dockable to any edge) and a borderless always-on-top window on Windows. The overlay window is sized exactly to the bar's content (no click-through hacks).
+
+## Product rules (user-agreed, don't drift)
+
+- Clip types: text, images, files. Files are stored as path references + metadata only — never copied into the store.
+- Paste: typing animation by default (~8–12 ms per char), with automatic instant-paste fallback for terminals and elevated windows.
+- Ctrl+Alt+V (history) ALWAYS reveals the bar, even if it was hidden with Ctrl+Alt+H. Hiding is a manual opt-out; clipboard capture and hotkeys keep running while hidden.
+- Hotkeys: Ctrl+Alt+1…9 paste the nth clip; ←/→ scroll history, ↓ expands to a grid, ↑ collapses (↑ again at 1-row shrinks the bar away); Ctrl+Alt+H toggles the bar.
+- Bar position setting: top/bottom/left/right. Layout must stay orientation-aware: left/right render a vertical column with transposed arrow navigation.
+- i18n: Dutch + English catalogs, system locale as default.
+- Animations (copy fly-in, paste typing, bar expand/shrink) are individually toggleable, plus a global reduced mode.
+- Autostart on boot: systemd user service on Linux, Task Scheduler/Run key on Windows.
+- Phasing: Phase 0 spike first (transparent always-on-top bar + clipboard capture + one hotkey + one paste on both OSes) to de-risk the platform layer before any polish.
