@@ -4,8 +4,10 @@ Cross-platform (Windows + Linux) clipboard manager: floating bar docked to a scr
 
 ## Status
 
-- Repo not yet scaffolded (Phase 0 spike pending). Do not invent build/test commands; after scaffolding, add the real verified commands here.
-- The decisions below were agreed with the user and are binding — don't re-litigate the stack or product rules.
+- Phase 0 spike, part 2 (clipboard capture + SQLite store + live UI) implemented on Linux: event-driven Wayland watcher (wl-clipboard-rs data-control), SQLite store at `~/.local/share/clippie/clippie.db` (sync-ready schema: UUIDv7 ids, `device_id`, timestamps, soft-delete tombstones), content-addressed image blobs under `~/.local/share/clippie/blobs/`, files as path references only, 500-row cap, consecutive-duplicate dedupe by content hash. Verified end-to-end on Hyprland (text/image/files capture, dedupe, newest-first ordering).
+- Windows watcher (`src-tauri/src/clipboard/windows.rs`, clipboard-win/arboard) is written but compile-unverified — no mingw-w64 cross-compiler on the dev machine. Verify on a Windows box or after installing mingw-w64: `rustup target add x86_64-pc-windows-gnu && cargo check --target x86_64-pc-windows-gnu`.
+- Verified commands (run from repo root): `npm install` (deps), `npm run tauri dev` (dev app), `npm run check` (svelte-check), `cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings` (Rust lint), `cargo test --manifest-path src-tauri/Cargo.toml` (unit tests).
+- Next spike work: hotkey + paste engine, then Windows verification. The decisions below were agreed with the user and are binding — don't re-litigate the stack or product rules.
 
 ## Locked stack
 

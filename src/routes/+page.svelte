@@ -4,21 +4,23 @@
   import OverlayBar from "$lib/components/overlay-bar.svelte";
   import { getRecentClips } from "$lib/tauri/commands";
   import { onClipboardUpdated } from "$lib/tauri/clipboard-events";
+  import type { ClipSummary } from "$types/clip";
   import type { UnlistenFn } from "@tauri-apps/api/event";
 
-  let clipCount = $state(0);
+  // Newest first. The store caps its history, so one page is the whole list
+  // and the bar's badge count is the real total.
+  let clips = $state<ClipSummary[]>([]);
 
   onMount(() => {
     getRecentClips()
-      .then((clips) => (clipCount = clips.length))
+      .then((recent) => (clips = recent))
       .catch((error) => console.error("failed to load recent clips", error));
 
-    // The Rust core only emits this event from part 2 on; until then the badge
-    // simply stays at 0 unless a test payload arrives.
+    // The core only emits for genuinely new clips (repeats of the newest clip
+    // are deduped away), so prepending keeps this in sync with the store.
     let unlisten: UnlistenFn | undefined;
     onClipboardUpdated((clip) => {
-      clipCount += 1;
-      console.debug("clipboard updated", clip.id, clip.kind);
+      clips = [clip, ...clips];
     })
       .then((stop) => (unlisten = stop))
       .catch((error) => console.error("failed to subscribe to clipboard events", error));
@@ -27,4 +29,4 @@
   });
 </script>
 
-<OverlayBar {clipCount} />
+<OverlayBar {clips} />

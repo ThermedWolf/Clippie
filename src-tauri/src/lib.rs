@@ -1,4 +1,6 @@
+mod clipboard;
 mod clips;
+mod store;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -6,6 +8,10 @@ use std::sync::Arc;
 #[cfg(target_os = "linux")]
 use gtk::prelude::WidgetExt;
 use tauri::{AppHandle, LogicalPosition, Manager, Monitor, WebviewWindow, WindowEvent};
+
+/// Clipboard change event pushed to the frontend when a new clip is stored.
+/// Must match `CLIPBOARD_UPDATED_EVENT` in `src/types/events.ts`.
+pub const CLIPBOARD_UPDATED_EVENT: &str = "clippie://clipboard-updated";
 
 /// Label of the overlay bar window declared in `tauri.conf.json`.
 const OVERLAY_WINDOW_LABEL: &str = "overlay";
@@ -124,6 +130,19 @@ fn dock_overlay_once_placed(app: &AppHandle) {
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
+            // History store under the user data dir (XDG data dir on Linux,
+            // Roaming AppData on Windows). A store failure at startup is
+            // fatal: without it there is no history feature at all.
+            let data_dir = dirs::data_dir()
+                .map(|dir| dir.join("clippie"))
+                .ok_or("could not determine user data directory")?;
+            let store = Arc::new(store::Store::open(&data_dir).map_err(|error| error.to_string())?);
+
+            // Event-driven capture: the watcher thread feeds clips into the
+            // store and pushes `CLIPBOARD_UPDATED_EVENT` to the frontend.
+            clipboard::spawn_watcher(app.handle().clone(), Arc::clone(&store));
+            app.manage(store);
+
             // A failed dock-in only leaves the bar at its default position;
             // log it and keep running rather than aborting the daemon.
             if let Err(error) = position_overlay_top_center(app.handle()) {

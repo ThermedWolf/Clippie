@@ -4,21 +4,14 @@
   import type { ClipSummary } from "$types/clip";
 
   interface Props {
-    clipCount: number;
+    clips: ClipSummary[];
   }
 
-  let { clipCount }: Props = $props();
+  let { clips }: Props = $props();
 
   // Clicking the brand pill pins the bar open (keyboard users cannot hover).
   // It stays open until clicked again or focus/hover leaves the bar.
   let pinned = $state(false);
-
-  // Placeholder history for the spike; the real clips arrive via IPC in part 2.
-  const placeholderClips: ClipSummary[] = [
-    { id: "demo-1", kind: "text", preview: "Copied text lands here…", createdAt: 0 },
-    { id: "demo-2", kind: "image", preview: "screenshot-2026-11-16.png", createdAt: 0 },
-    { id: "demo-3", kind: "files", preview: "3 files — ~/Projects", createdAt: 0 },
-  ];
 </script>
 
 <section class="dock" aria-label="Clippie clipboard bar">
@@ -32,11 +25,11 @@
     >
       <span class="mark"><ClippieMark /></span>
       <span class="name">Clippie</span>
-      <span class="badge" title="{clipCount} clips in history">{clipCount}</span>
+      <span class="badge" title="{clips.length} clips in history">{clips.length}</span>
     </button>
 
     <div class="clips" aria-hidden="false">
-      {#each placeholderClips as clip (clip.id)}
+      {#each clips as clip (clip.id)}
         <ClipChip {clip} />
       {/each}
     </div>
