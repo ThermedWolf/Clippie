@@ -4,6 +4,9 @@ version = "0.1.0"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2024"
+# The daemon binary is the default run target (`tauri dev` / `cargo run`);
+# `clippie-ctl` is built with `--bins`.
+default-run = "clippie"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -50,6 +53,13 @@ percent-encoding = "2.3"
 clipboard-win = { version = "5.4", features = ["monitor"] }
 arboard = "3.7"
 png = "0.18"
+# Global hotkeys (RegisterHotKey) + paste input (SendInput). Raw FFI bindings
+# only; no runtime beyond the OS.
+windows-sys = { version = "0.60", features = [
+    "Win32_Foundation",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_WindowsAndMessaging",
+] }
 
 [dev-dependencies]
 tempfile = "3"

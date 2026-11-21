@@ -1,5 +1,10 @@
 mod clipboard;
 mod clips;
+// Public: `clippie-ctl` (src/bin) resolves the socket path through this module.
+pub mod control;
+#[cfg(windows)]
+mod hotkeys;
+mod paste;
 mod store;
 
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -141,7 +146,17 @@ pub fn run() {
             // Event-driven capture: the watcher thread feeds clips into the
             // store and pushes `CLIPBOARD_UPDATED_EVENT` to the frontend.
             clipboard::spawn_watcher(app.handle().clone(), Arc::clone(&store));
-            app.manage(store);
+            app.manage(Arc::clone(&store));
+
+            // Hotkey funnel: compositor binds (Wayland) exec `clippie-ctl`,
+            // which talks to this socket; Windows hotkeys call the same
+            // handlers directly. A failed control server only disables
+            // hotkey-triggered actions, so log-and-continue is enough.
+            control::spawn_control_server(app.handle().clone(), Arc::clone(&store));
+            // Wayland apps cannot register hotkeys; on Windows the daemon
+            // owns its own global hotkeys (RegisterHotKey message pump).
+            #[cfg(windows)]
+            hotkeys::spawn_hotkey_thread(app.handle().clone(), Arc::clone(&store));
 
             // A failed dock-in only leaves the bar at its default position;
             // log it and keep running rather than aborting the daemon.

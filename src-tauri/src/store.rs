@@ -28,6 +28,15 @@ pub enum StoreError {
     Sql(rusqlite::Error),
 }
 
+/// A stored clip reduced to what hotkey paste needs: kind plus raw content
+/// (`None` for image blobs, which live on disk; file clips keep their JSON
+/// path list here).
+#[derive(Debug)]
+pub struct StoredClip {
+    pub kind: ClipKind,
+    pub content: Option<String>,
+}
+
 impl std::fmt::Display for StoreError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -226,6 +235,40 @@ impl Store {
         Ok(clips)
     }
 
+    /// The nth most recent live clip (1-based), for hotkey pasting.
+    pub fn nth_recent_clip(&self, position: usize) -> Result<Option<StoredClip>, StoreError> {
+        if position == 0 {
+            return Ok(None);
+        }
+        let connection = self.lock();
+        let row = connection
+            .query_row(
+                "SELECT kind, content
+                 FROM clips
+                 WHERE deleted_at IS NULL
+                 ORDER BY created_at DESC, id DESC
+                 LIMIT 1 OFFSET ?1",
+                params![(position - 1) as i64],
+                |row| {
+                    let label: String = row.get(0)?;
+                    Ok((
+                        ClipKind::from_label(&label),
+                        row.get::<_, Option<String>>(1)?,
+                    ))
+                },
+            )
+            .optional()
+            .map_err(StoreError::Sql)?;
+
+        match row {
+            None => Ok(None),
+            // A corrupt kind label must not fail the paste; same loud-skip
+            // policy as `recent_clips`, reported as "nothing pasteable here".
+            Some((None, _)) => Ok(None),
+            Some((Some(kind), content)) => Ok(Some(StoredClip { kind, content })),
+        }
+    }
+
     /// Keeps the newest `MAX_HISTORY_ROWS` rows, deleting the rest. Oldest
     /// rows are hard-deleted (not tombstoned): the cap is about local growth,
     /// and pruned rows that never synced have no peer copies. The sync design
@@ -328,5 +371,32 @@ mod tests {
         store.insert_capture(&b).expect("b").expect("stored");
         store.insert_capture(&a).expect("a2").expect("stored");
         assert_eq!(store.recent_clips(MAX_HISTORY_ROWS).expect("recent").len(), 3);
+    }
+
+    #[test]
+    fn nth_recent_clip_returns_positional_content() {
+        let (store, _dir) = temp_store();
+        store.insert_capture(&text_clip("first")).expect("first").expect("stored");
+        store.insert_capture(&text_clip("second")).expect("second").expect("stored");
+        store
+            .insert_capture(&CapturedClip::new(ClipPayload::Files { paths: vec!["/a".into()] }))
+            .expect("files")
+            .expect("stored");
+
+        // Newest first: position 1 is the files clip, 2 and 3 are the texts.
+        let first = store.nth_recent_clip(1).expect("nth 1").expect("clip");
+        assert_eq!(first.kind, ClipKind::Files);
+        let second = store.nth_recent_clip(2).expect("nth 2").expect("clip");
+        assert_eq!(second.content.as_deref(), Some("second"));
+        let third = store.nth_recent_clip(3).expect("nth 3").expect("clip");
+        assert_eq!(third.content.as_deref(), Some("first"));
+    }
+
+    #[test]
+    fn nth_recent_clip_out_of_range_and_zero_are_none() {
+        let (store, _dir) = temp_store();
+        store.insert_capture(&text_clip("only")).expect("insert").expect("stored");
+        assert!(store.nth_recent_clip(2).expect("nth 2").is_none());
+        assert!(store.nth_recent_clip(0).expect("nth 0").is_none());
     }
 }
