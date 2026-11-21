@@ -290,7 +290,7 @@ impl Store {
     fn store_blob(&self, hash: &str, png: &[u8]) -> Result<String, StoreError> {
         let path = self.blobs_dir.join(format!("{hash}.png"));
         if !path.exists() {
-            std::fs::write(&path, png).map_err(StoreError::Io)?;
+            write_atomically(&path, png)?;
         }
         Ok(path.to_string_lossy().into_owned())
     }
@@ -300,6 +300,26 @@ impl Store {
         // store cannot recover from that, but failing loudly beats hanging.
         self.connection.lock().expect("clip store mutex poisoned")
     }
+}
+
+/// Writes `bytes` to `path` via a same-directory temp file and `fs::rename`
+/// (atomic on one filesystem), so after a crash mid-write `path` is either
+/// absent or complete — never a truncated file later captures would trust.
+/// The temp file is removed when any step fails.
+fn write_atomically(path: &Path, bytes: &[u8]) -> Result<(), StoreError> {
+    let mut temp_name = path
+        .file_name()
+        .expect("blob path is built from a non-empty file name")
+        .to_os_string();
+    temp_name.push(".tmp");
+    let temp = path.with_file_name(temp_name);
+
+    let write = std::fs::write(&temp, bytes).and_then(|()| std::fs::rename(&temp, path));
+    if write.is_err() {
+        // Best effort: a stale temp file must not survive a failed write.
+        let _ = std::fs::remove_file(&temp);
+    }
+    write.map_err(StoreError::Io)
 }
 
 fn unix_millis() -> i64 {
