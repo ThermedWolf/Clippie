@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+/*
+ * Clippie design tokens — single source of truth for color, radius and motion.
+ * The bar floats over arbitrary desktop content, so surfaces are translucent
+ * dark glass with near-white ink; amber is the one brand accent (sticky-note
+ * association for "clipboard").
+ */
+@theme {
+  /* Colors */
+  --color-surface: rgb(15 17 21 / 0.78);
+  --color-surface-raised: rgb(15 17 21 / 0.92);
+  --color-chip: rgb(255 255 255 / 0.08);
+  --color-hairline: rgb(255 255 255 / 0.14);
+  --color-ink: #f2f4f7;
+  --color-ink-muted: #b8c0c9;
+  --color-accent: #fcd34d;
+  --color-accent-ink: #171204;
+
+  /* Radius */
+  --radius-bar: 14px;
+
+  /* Motion */
+  --ease-expand: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Overlay bar geometry — must mirror the window size in tauri.conf.json */
+  --bar-width-collapsed: 200px;
+  --bar-height-collapsed: 40px;
+  --bar-width-expanded: 420px;
+  --bar-height-expanded: 56px;
+  --bar-expand-duration: 200ms;
+}
+
+/* The window itself is transparent; the page must never paint a background. */
+html,
+body {
+  background: transparent;
+  overflow: hidden;
+  height: 100%;
+}
