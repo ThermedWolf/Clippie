@@ -275,7 +275,9 @@ pub fn paste_clip(store: &Arc<Store>, position: usize) -> String {
                 clip.kind.label()
             )
         }
-        // `unwrap` is safe: the guard above rejected `content: None`.
+        // `unwrap_or_default` is belt-and-braces: the guard above already
+        // rejected `content: None`, and the worker must never see a missing
+        // text payload.
         Ok(Some(clip)) => {
             if PASTE_IN_PROGRESS.swap(true, Ordering::SeqCst) {
                 return "err a paste is already in progress".into();
